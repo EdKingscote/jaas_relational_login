@@ -47,8 +47,10 @@ public class DBLogin extends SimpleLogin
 			psu = con.prepareStatement("SELECT " + passColumn + " FROM " + userTable +
 									   " WHERE " + userColumn + "=? AND" + passColumn + "=PASSWORD(?)" + where);
 
+			String queryPassword=String.valueOf(password);  
+
 			psu.setString(1, username);
-			psu.setString(2, password);
+			psu.setString(2, queryPassword);
 			
 			rsu = psu.executeQuery();
 			if (!rsu.next()) throw new FailedLoginException(getOption("errorMessage", "Invalid details"));
