@@ -11,9 +11,6 @@ import java.util.logging.Logger;
 import javax.security.auth.*;
 import javax.security.auth.callback.*;
 import javax.security.auth.login.*;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.apache.commons.codec.digest.Md5Crypt;
 
 /**
  * Simple database based authentication module.
@@ -30,10 +27,7 @@ public class DBLogin extends SimpleLogin
 	protected String                userTable;
 	protected String                userColumn;
 	protected String                passColumn;
-	protected String                saltColumn;
 	protected String                where;
-
-	private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
 	protected synchronized Vector validateUser(String username, char password[]) throws LoginException
 	{
@@ -50,43 +44,14 @@ public class DBLogin extends SimpleLogin
 			else
 			   con = DriverManager.getConnection(dbURL);
                         
-			psu = con.prepareStatement("SELECT " + passColumn + (!saltColumn.equals("") ? ("," + saltColumn) : "")  + " FROM " + userTable +
-									   " WHERE " + userColumn + "=?" + where);
+			psu = con.prepareStatement("SELECT " + passColumn + " FROM " + userTable +
+									   " WHERE " + userColumn + "=? AND" + passColumn + "=PASSWORD(?)" + where);
 
 			psu.setString(1, username);
+			psu.setString(2, password);
+			
 			rsu = psu.executeQuery();
 			if (!rsu.next()) throw new FailedLoginException(getOption("errorMessage", "Invalid details"));
-			String upwd = rsu.getString(1);
-                        String salt = (!saltColumn.equals("") ? rsu.getString(2) : "");
-                                               
-                        String tpwd = new String();
-                        
-                        String hashingAlg = getOption("hashAlgorithm", null);
-                                       
-                        if (hashingAlg != null && (!hashingAlg.isEmpty())) {
-
-			    if (hashingAlg.toLowerCase().equals("bcrypt")) {
-					tpwd = new String(password);
-					String upwd2 = "$2a" + upwd.substring(3);
-					if (!passwordEncoder.matches(tpwd, upwd2))
-						throw new FailedLoginException(getOption("errorMessage", "Invalid details (b)"));
-				} else if (hashingAlg.toLowerCase().equals("md5crypt")) {
-					tpwd = new String(password);
-					/* Check the password */
-					if (!upwd.equals(Md5Crypt.md5Crypt(tpwd.getBytes(), upwd))) throw new FailedLoginException(getOption("errorMessage", "Invalid details"));
-				} else {
-                               try {
-                                   tpwd = this.hash(new String(password) + salt, hashingAlg);  
-                               } catch (NoSuchAlgorithmException ex) {
-                                   Logger.getLogger(DBLogin.class.getName()).log(Level.SEVERE, null, ex);
-                               }
-                               /* Check the password */                        
-                               if (!upwd.toLowerCase().equals(tpwd.toLowerCase())) throw new FailedLoginException(getOption("errorMessage", "Invalid details"));
-			    }
-                        } else {
-		            tpwd = new String(password);
-                            if (!upwd.equals(tpwd)) throw new FailedLoginException(getOption("errorMessage", "Invalid details"));
-                        }
 
 			Vector p = new Vector();
 			p.add(new TypedPrincipal(username, TypedPrincipal.USER));
@@ -127,7 +92,6 @@ public class DBLogin extends SimpleLogin
 		userTable    = getOption("userTable",    "User");
 		userColumn   = getOption("userColumn", "user_name");
 		passColumn   = getOption("passColumn",    "user_passwd");
-                saltColumn   = getOption("saltColumn", "");
 		where        = getOption("where",        "");
 		if (null != where && where.length() > 0)
 			where = " AND " + where;
@@ -135,14 +99,4 @@ public class DBLogin extends SimpleLogin
 			where = "";
 	}
         
-        String hash(String input, String hashingAlg) throws NoSuchAlgorithmException {
-            MessageDigest mDigest = MessageDigest.getInstance(hashingAlg);
-            byte[] result = mDigest.digest(input.getBytes());
-            StringBuffer sb = new StringBuffer();
-            for (int i = 0; i < result.length; i++) {
-                sb.append(Integer.toString((result[i] & 0xff) + 0x100, 16).substring(1));
-            }
-         
-        return sb.toString();
-    }
 }
