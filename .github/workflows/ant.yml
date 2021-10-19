@@ -26,5 +26,5 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         name: Package
-        path: build/jar
+        path: /home/runner/work/jaas_relational_login/jaas_relational_login/target/
 
